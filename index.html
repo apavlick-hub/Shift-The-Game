@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>html{color-scheme:light}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Shift the Game</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: a single briefing column; the game tree is the centrepiece, the round card sits below it. */
+:root{
+  --bg:#EDF0F3; --surface:#FFFFFF; --sunk:#F5F7F9; --ink:#15202B; --muted:#56636F; --line:#D2D9E0;
+  --p0:#0B7A78; --p1:#6A4CC0; --accent:#C46A00; --accent-soft:#FBE9D2;
+  --good:#1D7F47; --good-soft:#DFF3E7; --bad:#B42318; --bad-soft:#FBE4E1;
+  --display:"Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body:"Public Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0E1318; --surface:#161E26; --sunk:#1C252E; --ink:#E5EAEF; --muted:#9AA7B4; --line:#2C3743;
+  --p0:#3DC4C0; --p1:#AE98F3; --accent:#F2A33A; --accent-soft:#3A2A14;
+  --good:#52C98A; --good-soft:#15301F; --bad:#F2796B; --bad-soft:#3A1A17; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0E1318; --surface:#161E26; --sunk:#1C252E; --ink:#E5EAEF; --muted:#9AA7B4; --line:#2C3743;
+  --p0:#3DC4C0; --p1:#AE98F3; --accent:#F2A33A; --accent-soft:#3A2A14;
+  --good:#52C98A; --good-soft:#15301F; --bad:#F2796B; --bad-soft:#3A1A17; color-scheme:dark }
+
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55}
+.wrap{max-width:980px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:20px 56px;display:flex;flex-direction:column;gap:22px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.12}
+h1{font-size:clamp(2.1rem,5.5vw,3.4rem);font-weight:800;letter-spacing:-0.02em}
+h2{font-size:1.55rem;font-weight:700}
+h3{font-size:1.12rem;font-weight:700}
+p{margin:0}
+.eyebrow{font-size:.74rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* top bar */
+.bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;background:none;border:0;padding:0;color:var(--ink)}
+.brand b{font-family:var(--display);font-weight:800;font-size:1.15rem;letter-spacing:-.01em}
+.score{font-family:var(--mono);font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.score strong{color:var(--ink)}
+
+/* home */
+.hero{display:flex;flex-direction:column;gap:14px;padding-block:10px 4px}
+.hero p{max-width:64ch;font-size:1.06rem}
+.techs{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.tech{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1.5px solid currentColor;width:max-content}
+.chip.payoffs{color:var(--p0)} .chip.remove{color:var(--p1)} .chip.irrational{color:var(--accent)}
+.tests{background:var(--sunk);border-radius:10px;padding:14px 16px;display:flex;gap:10px 28px;flex-wrap:wrap}
+.tests div{flex:1 1 260px;min-width:0}
+.cases{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}
+.case{text-align:left;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:10px;transition:border-color .15s, transform .15s}
+.case:hover{border-color:var(--accent);transform:translateY(-2px)}
+.case .go{margin-top:auto;font-weight:700;color:var(--accent);font-size:.92rem}
+.case .done{font-family:var(--mono);font-size:.8rem;color:var(--good)}
+
+/* case screen */
+.scen{display:flex;flex-direction:column;gap:10px}
+.scen .ctx{display:flex;flex-direction:column;gap:8px;max-width:72ch}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.9rem}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.treebox{overflow-x:auto;border-radius:8px;background:var(--sunk)}
+.treebox svg{display:block;width:100%;min-width:640px;height:auto}
+.toggle{background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:6px 12px;font-size:.85rem;font-weight:600}
+.toggle[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.note{font-size:.85rem;color:var(--muted)}
+
+.progress{display:flex;gap:6px}
+.progress i{width:28px;height:6px;border-radius:3px;background:var(--line)}
+.progress i.now{background:var(--accent)} .progress i.ok{background:var(--good)} .progress i.miss{background:var(--bad)}
+.mission{border-left:4px solid var(--accent);padding:4px 0 4px 14px;font-size:1.05rem}
+.opts{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;border:0}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer}
+.opt:hover{border-color:var(--muted)}
+.opt input{margin-top:5px;accent-color:var(--accent);flex:none}
+.opt.sel{border-color:var(--accent);background:var(--accent-soft)}
+.opt.right{border-color:var(--good);background:var(--good-soft)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-soft)}
+.opt.locked{cursor:default}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.btn{border:0;border-radius:8px;padding:11px 18px;font-weight:700;background:var(--ink);color:var(--bg)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+
+.verdict{border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.verdict.good{background:var(--good-soft)} .verdict.bad{background:var(--bad-soft)}
+.verdict h3{font-size:1.25rem}
+.verdict.good h3{color:var(--good)} .verdict.bad h3{color:var(--bad)}
+.checks{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.checks li{display:flex;gap:10px;align-items:flex-start}
+.mark{flex:none;width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;font-weight:800;font-size:.8rem;color:var(--surface);margin-top:1px}
+.mark.y{background:var(--good)} .mark.n{background:var(--bad)} .mark.na{background:var(--muted)}
+.why{max-width:72ch}
+
+.debrief{display:flex;flex-direction:column;gap:14px}
+.rows{display:flex;flex-direction:column;gap:8px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 12px;background:var(--sunk);border-radius:8px}
+.row .res{margin-left:auto;font-family:var(--mono);font-size:.82rem}
+.lesson{background:var(--accent-soft);border-radius:10px;padding:14px 16px;max-width:72ch}
+
+/* tree svg */
+.t-edge{stroke:var(--line);stroke-width:2.5;fill:none}
+.t-edge.best{stroke:var(--accent);stroke-opacity:.45;stroke-width:3}
+.t-edge.path{stroke:var(--accent);stroke-opacity:1;stroke-width:5}
+.t-edge.gone{stroke:var(--muted);stroke-dasharray:5 6;stroke-opacity:.6}
+.t-lab{font-family:var(--body);font-size:13px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--sunk);stroke-width:5px;stroke-linejoin:round}
+.t-lab.gone{fill:var(--muted);text-decoration:line-through}
+.t-lab.commit{fill:var(--accent)}
+.t-node{fill:var(--surface);stroke-width:3}
+.t-init{font-family:var(--display);font-weight:800;font-size:15px}
+.t-own{font-family:var(--body);font-weight:700;font-size:12px;letter-spacing:.04em;paint-order:stroke;stroke:var(--sunk);stroke-width:6px;stroke-linejoin:round}
+.t-box{fill:var(--surface);stroke:var(--line);stroke-width:1.5}
+.t-box.path{stroke:var(--accent);stroke-width:3}
+.t-box.target{stroke-dasharray:6 4;stroke:var(--ink)}
+.t-name{font-family:var(--body);font-size:12px;fill:var(--ink)}
+.t-pay{font-family:var(--mono);font-size:13px;font-weight:700}
+.t-delta{font-family:var(--mono);font-size:11px;font-weight:500;fill:var(--muted)}
+.t-flag{font-family:var(--body);font-size:11px;font-weight:700;fill:var(--accent);letter-spacing:.05em;paint-order:stroke;stroke:var(--sunk);stroke-width:6px;stroke-linejoin:round}
+
+@media (prefers-reduced-motion: reduce){ .case{transition:none} .case:hover{transform:none} }
+@media (max-width:520px){ .btn{flex:1 1 auto} }
+</style>
+</head>
+<body>
+
+<div class="wrap" id="app"></div>
+
+<script>
+/*ENGINE-START*/
+const TECH = {
+  payoffs:   {name:"Change payoffs",   def:"Alter what a player gets at one or more outcomes (side payments, penalties, conditional rewards) so their best response changes."},
+  remove:    {name:"Remove strategies", def:"Take an option off the table, yours or theirs (binding laws, legal designations, automatic triggers) so a branch of the tree no longer exists."},
+  irrational:{name:"Act irrationally",  def:"Commit to an action that looks against your own interest, and make it believable by attaching a visible cost to backing down."}
+};
+
+const CASES = [
+{
+  id:"health", domain:"Domestic health policy", title:"The Soda Levy",
+  blurb:"A state proposes a 2¢-per-ounce tax on sugar-sweetened beverages. The beverage industry has deep pockets and a litigation playbook.",
+  context:[
+    "Your state's health department wants a 2¢-per-ounce excise tax on sugar-sweetened beverages, with revenue earmarked for school nutrition. The beverage industry's association has blocked or diluted similar taxes elsewhere by suing on preemption and procedural grounds, then extracting exemptions in settlement.",
+    "The State moves first: enact the levy or accept the industry's offer of a voluntary reformulation pledge. If the levy is enacted, industry decides whether to comply or sue. If it sues, the State decides whether to defend in court or settle with exemptions."
+  ],
+  players:["State","Industry"], full:["State government","Beverage industry"], advise:0,
+  root:"h0",
+  nodes:{
+    h0:{owner:0, kids:[{k:"enact",a:"Enact levy",to:"h1"},{k:"pledge",a:"Accept pledge",to:"pledge"}]},
+    h1:{owner:1, kids:[{k:"sue",a:"Sue to block",to:"h2"},{k:"comply",a:"Comply",to:"written"}]},
+    h2:{owner:0, kids:[{k:"defend",a:"Defend in court",to:"court"},{k:"settle",a:"Settle",to:"diluted"}]}
+  },
+  terms:{
+    court:  {name:"Multi-year court fight", p:[25,30]},
+    diluted:{name:"Levy diluted by exemptions", p:[45,50]},
+    written:{name:"Levy takes effect as written", p:[70,20]},
+    pledge: {name:"Voluntary industry pledge", p:[40,60]}
+  },
+  rounds:[
+    {tech:"payoffs", target:"written",
+     mission:"Get the levy enacted exactly as written by changing a payoff.",
+     options:[
+      {text:"Raise the proposed rate from 2¢ to 3¢ per ounce so the revenue and health gains are larger.",
+       tech:"payoffs", ops:[{t:"delta",term:"written",d:[10,-15]}],
+       why:"This raises your payoff from the levy, but it makes complying even worse for industry (20 → 5). Industry compares complying with suing, and suing still pays more, so you end up settling again. A payoff change has to shift the comparison the other player is making."},
+      {text:"Phase the levy in over two years and write a reformulation tax credit for bottlers into the bill.",
+       tech:"payoffs", ops:[{t:"delta",term:"written",d:[-5,35]}],
+       why:"This targets the payoff that matters. Industry's value from complying rises from 20 to 55, above the 50 it expects from suing and settling. Because it is written into the bill, industry can see it and rely on it. You give up a little (70 → 65) to get the levy intact."},
+      {text:"Make the voluntary pledge more generous to industry, so it has a softer landing if the levy fails.",
+       tech:"payoffs", ops:[{t:"delta",term:"pledge",d:[0,10]}],
+       why:"This changes a branch nobody chooses. You still prefer enacting the levy, industry still prefers to sue, and the outcome doesn't move."},
+      {text:"Commission an independent study on the levy's projected health benefits.",
+       tech:"payoffs", ops:[],
+       why:"Good evidence may help politically, but as described it doesn't change what any player gets at any outcome, so the game is unchanged."}
+     ]},
+    {tech:"remove", target:"written",
+     mission:"Get the levy enacted exactly as written by removing a strategy.",
+     options:[
+      {text:"Pass a statute barring the Attorney General from settling any challenge to the levy.",
+       tech:"remove", ops:[{t:"remove",node:"h2",kid:"settle"}],
+       why:"With settlement gone, a lawsuit leads to a long court fight. That is worth 30 to industry, still more than the 20 from complying, so it sues. Worse, a court fight is worth only 25 to you, less than the pledge (40), so you would not enact the levy at all. Removing your own option helps only if it changes what the other side does."},
+      {text:"Enact the levy by voter-approved constitutional amendment, eliminating the state-law grounds industry would sue on.",
+       tech:"remove", ops:[{t:"remove",node:"h1",kid:"sue"}],
+       why:"With no viable lawsuit, industry's only option is to comply, and the levy takes effect as written. The catch is cost and feasibility: only some states allow citizen-initiated amendments, and a campaign takes time."},
+      {text:"Formally withdraw from talks on the voluntary pledge so the levy is the only path forward.",
+       tech:"remove", ops:[{t:"remove",node:"h0",kid:"pledge"}],
+       why:"This removes a branch you weren't choosing anyway. Industry still sues, you still settle, and the levy is still diluted."},
+      {text:"Announce that the State is 'prepared to use every tool available' if industry sues.",
+       tech:"remove", ops:[],
+       why:"This is cheap talk. It removes no option and changes no payoff, so industry has no reason to change course."}
+     ]},
+    {tech:"irrational", target:"written",
+     mission:"Get the levy enacted exactly as written by committing to something that looks irrational.",
+     options:[
+      {text:"Have the Governor declare she will fight any lawsuit to the Supreme Court, however long it takes.",
+       tech:"irrational", ops:[{t:"force",node:"h2",kid:"defend"}],
+       why:"Industry looks ahead. Once a suit is filed, fighting is worth 25 to the State and settling is worth 45, so the Governor would settle. The threat isn't credible, industry sues anyway, and the levy is diluted."},
+      {text:"Have the Governor vow to fight to the end, pre-fund the legal defense, and run a public campaign that frames any settlement as caving to Big Soda.",
+       tech:"irrational", ops:[{t:"force",node:"h2",kid:"defend"},{t:"delta",term:"court",d:[25,-25]}],
+       why:"The campaign creates an audience cost: settling would now be a visible political defeat, so fighting is worth 50 to the State, above settling's 45. The threat is now a best response, and everyone can see it. The pre-funded defense and public pressure also raise industry's cost of a court fight (30 → 5), so industry complies."},
+      {text:"Phase the levy in over two years with a reformulation tax credit.",
+       tech:"payoffs", ops:[{t:"delta",term:"written",d:[-5,35]}],
+       why:"This works, but it's a payoff change, not an irrational commitment. This round asks for a move that binds you to an action you would otherwise avoid."},
+      {text:"Signal early that the State would accept a settlement with modest exemptions.",
+       tech:"irrational", ops:[{t:"force",node:"h2",kid:"settle"}],
+       why:"Committing to what you would do anyway isn't irrational and changes nothing. Industry sues, you settle, and the levy is diluted."}
+     ]}
+  ],
+  lesson:"The State's weak point is the settlement node. Industry sues because it expects the State to fold. Each winning move works on that expectation: by making compliance attractive, by removing the lawsuit, or by making folding politically costly."
+},
+{
+  id:"geo", domain:"Geopolitics", title:"Critical Minerals Standoff",
+  blurb:"A dominant producer of processed rare earths threatens export restrictions. An importing economy must decide how to respond.",
+  context:[
+    "A country that processes most of the world's supply of a critical mineral used in magnets and defense electronics is weighing export restrictions on a large importing economy. Restricting would let it extract a price premium and political concessions. You advise the Importer.",
+    "The Exporter moves first: restrict exports or keep them open. If it restricts, the Importer decides whether to accept and pay the premium or retaliate with tariffs. If the Importer retaliates, the Exporter decides whether to escalate or back down."
+  ],
+  players:["Exporter","Importer"], full:["Exporting state","Importing economy"], advise:1,
+  root:"g0",
+  nodes:{
+    g0:{owner:0, kids:[{k:"restrict",a:"Restrict exports",to:"g1"},{k:"open",a:"Keep open",to:"open"}]},
+    g1:{owner:1, kids:[{k:"accept",a:"Accept & pay",to:"premium"},{k:"retaliate",a:"Retaliate",to:"g2"}]},
+    g2:{owner:0, kids:[{k:"escalate",a:"Escalate",to:"war"},{k:"backdown",a:"Back down",to:"lifted"}]}
+  },
+  terms:{
+    premium:{name:"Importer pays a price premium", p:[65,25]},
+    war:    {name:"Tit-for-tat trade war", p:[30,20]},
+    lifted: {name:"Exporter lifts restrictions", p:[10,45]},
+    open:   {name:"Open trade continues", p:[40,60]}
+  },
+  rounds:[
+    {tech:"payoffs", target:"open",
+     mission:"Keep the mineral flowing on open terms by changing a payoff.",
+     options:[
+      {text:"Announce a standing tariff on the Exporter's manufactured goods for as long as any restriction lasts.",
+       tech:"payoffs", ops:[{t:"delta",term:"premium",d:[-20,-5]},{t:"delta",term:"war",d:[-10,-5]}],
+       why:"This hurts the Exporter (the premium outcome drops from 65 to 45), but not enough. Restricting still beats open trade (40) for it. A penalty has to be large enough to flip the comparison the decision-maker actually makes."},
+      {text:"Offer a 10-year purchase agreement plus investment in the Exporter's refining sector, conditional on exports staying open.",
+       tech:"payoffs", ops:[{t:"delta",term:"open",d:[30,-5]}],
+       why:"This raises the Exporter's payoff from open trade from 40 to 70, above the 65 it expects from restricting. Making it conditional means the Exporter can see it and loses it if it restricts. You pay something (60 → 55) to secure supply."},
+      {text:"Build a two-year strategic stockpile so restrictions hurt less.",
+       tech:"payoffs", ops:[{t:"delta",term:"premium",d:[0,10]}],
+       why:"A stockpile makes accepting restrictions less painful for you (25 → 35), which makes you even more willing to accept them. The Exporter's calculation is unchanged, so it still restricts."},
+      {text:"Issue a joint statement with allies condemning export restrictions as economic coercion.",
+       tech:"payoffs", ops:[],
+       why:"Condemnation alone changes no one's payoffs. The Exporter restricts and you pay."}
+     ]},
+    {tech:"remove", target:"open",
+     mission:"Keep the mineral flowing on open terms by removing a strategy.",
+     options:[
+      {text:"Sign a standstill pledge renouncing retaliatory tariffs in mineral disputes.",
+       tech:"remove", ops:[{t:"remove",node:"g1",kid:"retaliate"}],
+       why:"This removes the only thing the Exporter had reason to fear. You are left to accept and pay."},
+      {text:"Pass a law requiring automatic retaliatory tariffs whenever a supplier restricts critical-mineral exports, with no executive waiver.",
+       tech:"remove", ops:[{t:"remove",node:"g1",kid:"accept"}],
+       why:"By removing your own option to accept, you make retaliation automatic. The Exporter now expects a trade war (30 for it) if it restricts, which is worse than open trade (40), so it keeps exports open. The no-waiver clause is essential; with a waiver, the option is back."},
+      {text:"Pass the same automatic-retaliation law, but let the President waive it in the national interest.",
+       tech:"remove", ops:[],
+       why:"The waiver keeps the accept option alive, and the Exporter knows that accepting (25) beats a trade war (20) for you, so it expects the waiver to be used. Compare the national-interest waiver in the 2026 Sanctioning Russia Act."},
+      {text:"Build a two-year strategic stockpile so restrictions hurt less.",
+       tech:"payoffs", ops:[{t:"delta",term:"premium",d:[0,10]}],
+       why:"This is a payoff change, not a removal, and it moves things the wrong way: it makes you more willing to accept restrictions."}
+     ]},
+    {tech:"irrational", target:"open",
+     mission:"Keep the mineral flowing on open terms by committing to something that looks irrational.",
+     options:[
+      {text:"Have the head of government declare that any restriction will be met with tariffs.",
+       tech:"irrational", ops:[{t:"force",node:"g1",kid:"retaliate"}],
+       why:"The Exporter looks ahead. Once restrictions are in place, accepting is worth 25 to you and a trade war only 20, so you would back down. The threat isn't believed, and the Exporter restricts."},
+      {text:"Declare that any restriction will be met with tariffs, and back it with a unanimous parliamentary resolution framing acceptance as capitulation to coercion.",
+       tech:"irrational", ops:[{t:"force",node:"g1",kid:"retaliate"},{t:"delta",term:"premium",d:[0,-10]}],
+       why:"The resolution creates an audience cost: quietly paying the premium would now be a public capitulation, so accepting is worth only 15 to you, below a trade war's 20. Retaliation is now your best response, and the Exporter can see that. Facing a trade war (30) rather than open trade (40), it keeps exports open."},
+      {text:"Offer a 10-year purchase agreement and refining investment, conditional on exports staying open.",
+       tech:"payoffs", ops:[{t:"delta",term:"open",d:[30,-5]}],
+       why:"This works, but it's a payoff change. This round asks for a commitment to an action you would otherwise avoid."},
+      {text:"Signal privately that you would accept moderate restrictions to keep relations calm.",
+       tech:"irrational", ops:[{t:"force",node:"g1",kid:"accept"}],
+       why:"Committing to the move you'd make anyway isn't irrational, and it invites the restriction. The Exporter restricts and you pay."}
+     ]}
+  ],
+  lesson:"Restricting pays for the Exporter only because it expects you to accept. Every winning move breaks that expectation, either by making open trade more valuable to it or by making your retaliation automatic or credible. Waivers and private reassurances quietly restore the option you were trying to remove."
+},
+{
+  id:"env", domain:"Environmental advocacy", title:"The Marsh Parcel",
+  blurb:"A developer plans a logistics hub on a tidal wetland. A conservation coalition wants the marsh protected.",
+  context:[
+    "A developer has secured land for a logistics warehouse that would fill 40 acres of tidal marsh, an important flood buffer and bird habitat. A coalition of local conservation groups wants the project redesigned to avoid the wetland. You advise the Coalition.",
+    "The Developer moves first: build as planned or redesign around the wetland. If it builds, the Coalition can sue under state wetland law or organize a site blockade. After a suit, the Developer can fight or settle; after a blockade, it can shrink the footprint or hold firm."
+  ],
+  players:["Developer","Coalition"], full:["Developer","Conservation coalition"], advise:1,
+  root:"e0",
+  nodes:{
+    e0:{owner:0, kids:[{k:"build",a:"Build as planned",to:"e1"},{k:"redesign",a:"Redesign",to:"redesign"}]},
+    e1:{owner:1, kids:[{k:"sue",a:"Sue",to:"e2"},{k:"blockade",a:"Blockade",to:"e3"}]},
+    e2:{owner:0, kids:[{k:"fight",a:"Fight",to:"litig"},{k:"settle",a:"Settle",to:"settle"}]},
+    e3:{owner:0, kids:[{k:"shrink",a:"Shrink",to:"shrink"},{k:"hold",a:"Hold firm",to:"standoff"}]}
+  },
+  terms:{
+    litig:   {name:"Years of litigation", p:[20,30]},
+    settle:  {name:"Settlement, narrow buffer", p:[45,40]},
+    shrink:  {name:"Footprint shrinks", p:[35,30]},
+    standoff:{name:"Arrests and stalemate", p:[10,15]},
+    redesign:{name:"Wetland protected by redesign", p:[40,50]}
+  },
+  rounds:[
+    {tech:"payoffs", target:"redesign",
+     mission:"Get the project redesigned around the wetland by changing a payoff.",
+     options:[
+      {text:"Lobby for higher fines on developers who start construction while litigation is pending.",
+       tech:"payoffs", ops:[{t:"delta",term:"litig",d:[-10,0]}],
+       why:"This penalizes a branch the Developer never reaches, since it settles rather than fights. Its expected payoff from building stays at 45, above redesign's 40."},
+      {text:"Raise funds to buy wetland mitigation credits from the Developer, paid only if the redesign is filed with the permit.",
+       tech:"payoffs", ops:[{t:"delta",term:"redesign",d:[15,-5]}],
+       why:"This lifts the Developer's payoff from redesigning from 40 to 55, above the 45 it expects from building and settling. Because it is tied to the permit filing, it is observable and conditional. The Coalition spends some capital (50 → 45) to protect the full marsh."},
+      {text:"Offer a token donation to the Developer's community fund if it redesigns.",
+       tech:"payoffs", ops:[{t:"delta",term:"redesign",d:[3,-1]}],
+       why:"Right direction, wrong size. Redesign rises to 43 for the Developer, still below the 45 it expects from building. Side payments have to clear the gap."},
+      {text:"Build a bigger legal war chest so a full trial costs the Coalition less.",
+       tech:"payoffs", ops:[{t:"delta",term:"litig",d:[0,10]}],
+       why:"This improves your payoff on a branch the Developer will never let happen: it settles before trial. Nothing changes."}
+     ]},
+    {tech:"remove", target:"redesign",
+     mission:"Get the project redesigned around the wetland by removing a strategy.",
+     options:[
+      {text:"Win state designation of the marsh as a Critical Area before permits issue, so building on it is no longer legal.",
+       tech:"remove", ops:[{t:"remove",node:"e0",kid:"build"}],
+       why:"This takes 'build as planned' out of the Developer's choice set. Its only remaining option is to redesign. Designation fights are slow and political, so timing matters: it has to happen before permits vest."},
+      {text:"Publicly renounce blockades and civil disobedience to keep the county on side.",
+       tech:"remove", ops:[{t:"remove",node:"e1",kid:"blockade"}],
+       why:"You were never going to blockade anyway (suing pays more), so removing it changes nothing. The Developer builds, you sue, and it settles."},
+      {text:"Tell the press the Coalition 'will use every tool available' to save the marsh.",
+       tech:"remove", ops:[],
+       why:"Cheap talk removes nothing. The Developer still expects to settle a suit cheaply."},
+      {text:"Raise funds to buy mitigation credits if the Developer redesigns.",
+       tech:"payoffs", ops:[{t:"delta",term:"redesign",d:[15,-5]}],
+       why:"This works, but it's a payoff change, not a removal."}
+     ]},
+    {tech:"irrational", target:"redesign",
+     mission:"Get the project redesigned around the wetland by committing to something that looks irrational.",
+     options:[
+      {text:"Announce that if construction starts, the Coalition will blockade the site rather than sue.",
+       tech:"irrational", ops:[{t:"force",node:"e1",kid:"blockade"}],
+       why:"The Developer looks ahead. Once construction starts, suing and settling is worth 40 to you and a blockade only 30, so you would sue. The threat isn't believed, and the Developer builds."},
+      {text:"Pledge to members and funders that the Coalition will blockade and will never accept a negotiated buffer, with every board member signing.",
+       tech:"irrational", ops:[{t:"force",node:"e1",kid:"blockade"},{t:"delta",term:"settle",d:[0,-15]}],
+       why:"The signed pledge creates an audience cost: a settlement would now look like a sell-out, costing members and funding, so it is worth only 25 to you, below a blockade's 30. The blockade is now your best response, and the Developer can see it. Expecting a blockade that shrinks the project (35 for it), the Developer prefers to redesign (40)."},
+      {text:"Win state designation of the marsh as a Critical Area.",
+       tech:"remove", ops:[{t:"remove",node:"e0",kid:"build"}],
+       why:"This works, but it removes the Developer's option. This round asks for an irrational-looking commitment of your own."},
+      {text:"Announce the Coalition will sue and is open to a negotiated buffer.",
+       tech:"irrational", ops:[{t:"force",node:"e1",kid:"sue"}],
+       why:"This commits you to what you would do anyway. The Developer builds, expecting a cheap settlement."}
+     ]}
+  ],
+  lesson:"The Developer builds because a lawsuit ends in a settlement it can live with. Advocates win by changing that expectation: paying for redesign, taking the build option off the table, or credibly binding themselves to a costlier response. Note that the blockade threat works only once settling is costly for the Coalition itself."
+}
+];
+
+/* Backward induction with optional payoff deltas, removed branches and forced (committed) choices.
+   A forced choice is credible only if it is the owner's best response at that node given the changed payoffs;
+   if not, the other player ignores the commitment and the game plays out without it. */
+function solve(c, ops){
+  ops = ops || [];
+  const delta = {}, removed = {}, forced = {};
+  ops.forEach(o => {
+    if (o.t === "delta") delta[o.term] = o.d;
+    else if (o.t === "remove") (removed[o.node] = removed[o.node] || {})[o.kid] = true;
+    else if (o.t === "force") forced[o.node] = o.kid;
+  });
+  const choice = {}, credibility = [], ties = [];
+  const pay = id => { const b = c.terms[id].p, d = delta[id] || [0,0]; return [b[0]+d[0], b[1]+d[1]]; };
+  function val(id){
+    if (c.terms[id]) return pay(id);
+    const n = c.nodes[id];
+    const kids = n.kids.filter(k => !(removed[id] && removed[id][k.k]));
+    const vals = kids.map(k => ({k:k.k, v:val(k.to)}));
+    let best = vals[0];
+    vals.forEach(x => { if (x.v[n.owner] > best.v[n.owner]) best = x; });
+    vals.forEach(x => { if (x !== best && x.v[n.owner] === best.v[n.owner]) ties.push(id); });
+    let pick = best;
+    if (forced[id]) {
+      const f = vals.find(x => x.k === forced[id]);
+      const ok = f && f.v[n.owner] >= best.v[n.owner];
+      credibility.push({node:id, owner:n.owner, forced:forced[id], best:best.k, fv:f ? f.v[n.owner] : null, bv:best.v[n.owner], ok:!!ok});
+      if (ok) pick = f;
+    }
+    choice[id] = pick.k;
+    return pick.v;
+  }
+  val(c.root);
+  // walk the equilibrium path
+  const path = []; let id = c.root;
+  while (!c.terms[id]) { const k = choice[id]; path.push(id + ":" + k); id = c.nodes[id].kids.find(x => x.k === k).to; }
+  return {outcome:id, payoff:pay(id), choice, path, credibility, credible:credibility.every(x => x.ok), ties, delta, removed, forced, pay};
+}
+
+function judge(c, round, opt){
+  const res = solve(c, opt.ops);
+  const techOk = opt.tech === round.tech;
+  const reach = res.outcome === round.target;
+  const hasForce = opt.ops.some(o => o.t === "force");
+  return {res, techOk, reach, hasForce, credible:res.credible, correct: techOk && reach && res.credible};
+}
+/*ENGINE-END*/
+
+/* ---------------- UI ---------------- */
+const app = document.getElementById("app");
+const S = { view:"home", cid:null, r:0, sel:null, phase:"choose", order:[], showEq:false, results:{} };
+CASES.forEach(c => S.results[c.id] = []);
+
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+const pcol = i => i === 0 ? "var(--p0)" : "var(--p1)";
+const kidLabel = (c, node, k) => c.nodes[node].kids.find(x => x.k === k).a;
+
+function totals(){
+  let first = 0, done = 0;
+  CASES.forEach(c => S.results[c.id].forEach(x => { done++; if (x === "first") first++; }));
+  return {first, done};
+}
+function bar(){
+  const t = totals();
+  return `<div class="bar">
+    <button class="brand" id="home-btn" aria-label="Back to case list">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="5" r="3.2" fill="var(--accent)"/><path d="M14 8 L6 20 M14 8 L22 20" stroke="var(--ink)" stroke-width="2.2" fill="none"/><circle cx="6" cy="22" r="3" fill="var(--p0)"/><circle cx="22" cy="22" r="3" fill="var(--p1)"/></svg>
+      <b>Shift the Game</b></button>
+    <span class="score">First-try correct <strong>${t.first}</strong> / ${t.done || 0} played</span>
+  </div>`;
+}
+
+/* ---- tree drawing ---- */
+function wrapText(s, n){ const w = s.split(" "), out = []; let line = "";
+  w.forEach(x => { if ((line + " " + x).trim().length > n) { if (line) out.push(line); line = x; } else line = (line + " " + x).trim(); });
+  if (line) out.push(line); return out; }
+
+function drawTree(c, res, o){
+  o = o || {};
+  const pos = {}; let leaf = 0, maxD = 0;
+  (function walk(id, d){
+    maxD = Math.max(maxD, d);
+    if (c.terms[id]) { pos[id] = {x:leaf++, d}; return pos[id].x; }
+    const xs = c.nodes[id].kids.map(k => walk(k.to, d+1));
+    pos[id] = {x:(xs[0] + xs[xs.length-1]) / 2, d}; return pos[id].x;
+  })(c.root, 0);
+  const SP = 176, PAD = 100, LH = 118, TOP = 46;
+  const W = PAD*2 + (leaf-1)*SP, H = TOP + maxD*LH + 78;
+  const X = id => PAD + pos[id].x*SP, Y = id => TOP + pos[id].d*LH;
+  const onPath = new Set(o.highlight && res ? res.path : []);
+  const pathTerm = o.highlight && res ? res.outcome : null;
+  let edges = "", labels = "", nodes = "", boxes = "";
+
+  Object.keys(c.nodes).forEach(id => {
+    const n = c.nodes[id], x1 = X(id), y1 = Y(id);
+    n.kids.forEach(k => {
+      const x2 = X(k.to), y2 = Y(k.to) - (c.terms[k.to] ? 22 : 20);
+      const gone = res && res.removed[id] && res.removed[id][k.k];
+      const committed = res && res.forced[id] === k.k;
+      let cls = "t-edge";
+      if (gone) cls += " gone";
+      else if (o.highlight && res && onPath.has(id + ":" + k.k)) cls += " path";
+      else if (o.highlight && res && res.choice[id] === k.k) cls += " best";
+      edges += `<line class="${cls}" x1="${x1}" y1="${y1+20}" x2="${x2}" y2="${y2}"/>`;
+      const mx = x1 + (x2 - x1)*0.5, my = y1 + 20 + (y2 - y1 - 20)*0.5;
+      const anchor = x2 < x1 - 1 ? "end" : x2 > x1 + 1 ? "start" : "middle";
+      const dx = anchor === "end" ? -8 : anchor === "start" ? 8 : 0;
+      labels += `<text class="t-lab${gone ? " gone" : ""}${committed ? " commit" : ""}" x="${mx+dx}" y="${my}" text-anchor="${anchor}">${esc(k.a)}${committed ? " · committed" : ""}${gone ? " · removed" : ""}</text>`;
+    });
+    nodes += `<circle class="t-node" cx="${x1}" cy="${y1}" r="20" stroke="${pcol(n.owner)}"/>
+      <text class="t-init" x="${x1}" y="${y1+5}" text-anchor="middle" fill="${pcol(n.owner)}">${esc(c.players[n.owner][0])}</text>
+      <text class="t-own" x="${x1}" y="${y1-28}" text-anchor="middle" fill="${pcol(n.owner)}">${esc(c.players[n.owner].toUpperCase())}</text>`;
+  });
+
+  Object.keys(c.terms).forEach(id => {
+    const t = c.terms[id], x = X(id), y = Y(id) - 22, w = 156;
+    const lines = wrapText(t.name, 22);
+    const h = 22 + lines.length*15 + 22;
+    const d = res && res.delta[id];
+    const p = res ? res.pay(id) : t.p;
+    const isPath = pathTerm === id;
+    const isTarget = o.target === id && !isPath;
+    boxes += `<rect class="t-box${isPath ? " path" : ""}${isTarget ? " target" : ""}" x="${x - w/2}" y="${y}" width="${w}" height="${h}" rx="8"/>`;
+    if (o.target === id) boxes += `<text class="t-flag" x="${x}" y="${y - 7}" text-anchor="middle">TARGET</text>`;
+    lines.forEach((ln, i) => boxes += `<text class="t-name" x="${x}" y="${y + 18 + i*15}" text-anchor="middle">${esc(ln)}</text>`);
+    const py = y + 18 + lines.length*15 + 8;
+    const fmt = (v, dv) => dv ? `${v}<tspan class="t-delta"> (${dv > 0 ? "+" : "−"}${Math.abs(dv)})</tspan>` : `${v}`;
+    boxes += `<text class="t-pay" x="${x}" y="${py}" text-anchor="middle"><tspan fill="${pcol(0)}">${fmt(p[0], d && d[0])}</tspan><tspan fill="var(--muted)">  ·  </tspan><tspan fill="${pcol(1)}">${fmt(p[1], d && d[1])}</tspan></text>`;
+  });
+
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Game tree for ${esc(c.title)}">${edges}${nodes}${boxes}${labels}</svg>`;
+}
+
+/* ---- views ---- */
+function render(){
+  if (S.view === "home") app.innerHTML = bar() + homeView();
+  else if (S.view === "round") app.innerHTML = bar() + roundView();
+  else app.innerHTML = bar() + debriefView();
+  wire();
+}
+
+function homeView(){
+  return `
+  <section class="hero">
+    <span class="eyebrow">A practice game on strategic moves</span>
+    <h1>Shift the game</h1>
+    <p>Each case is a sequential game with illustrative payoffs (0–100 utility scores, higher is better; the first number belongs to the first player). Your job is to change the outcome using one specific technique per round. The game solves each modified tree by backward induction, so you will see exactly why a move works or fails.</p>
+  </section>
+  <section class="techs" aria-label="The three techniques">
+    ${Object.keys(TECH).map(k => `<div class="tech"><span class="chip ${k}">${TECH[k].name}</span><p>${TECH[k].def}</p></div>`).join("")}
+  </section>
+  <section class="tests">
+    <div><h3>Credible</h3><p class="muted">When the moment comes, carrying out the move must be the player's best response. Otherwise the other side calls the bluff.</p></div>
+    <div><h3>Observable</h3><p class="muted">The other player must see the move before choosing. Private intentions and vague statements change nothing.</p></div>
+  </section>
+  <section class="cases" aria-label="Choose a case">
+    ${CASES.map(c => { const r = S.results[c.id]; const f = r.filter(x => x === "first").length;
+      return `<button class="case" data-case="${c.id}">
+        <span class="eyebrow">${esc(c.domain)}</span>
+        <h2>${esc(c.title)}</h2>
+        <p class="muted">${esc(c.blurb)}</p>
+        <p style="font-size:.9rem">You advise: <strong style="color:${pcol(c.advise)}">${esc(c.full[c.advise])}</strong></p>
+        ${r.length === 3 ? `<span class="done">Completed · ${f}/3 first try</span>` : ""}
+        <span class="go">${r.length === 3 ? "Play again" : "Start case · 3 rounds"} →</span>
+      </button>`; }).join("")}
+  </section>`;
+}
+
+function roundView(){
+  const c = CASES.find(x => x.id === S.cid), round = c.rounds[S.r];
+  const base = solve(c, []);
+  const res = S.results[c.id];
+  let html = `
+  <section class="scen">
+    <span class="eyebrow">${esc(c.domain)} · Round ${S.r+1} of 3</span>
+    <h2>${esc(c.title)}</h2>
+    ${S.r === 0 && S.phase === "choose" ? `<div class="ctx">${c.context.map(p => `<p>${esc(p)}</p>`).join("")}</div>` :
+      `<details><summary class="note" style="cursor:pointer">Reread the scenario</summary><div class="ctx" style="margin-top:8px">${c.context.map(p => `<p>${esc(p)}</p>`).join("")}</div></details>`}
+    <div class="legend">
+      <span><i class="dot" style="background:var(--p0)"></i>${esc(c.full[0])} (first number)</span>
+      <span><i class="dot" style="background:var(--p1)"></i>${esc(c.full[1])} (second number)</span>
+      <span>You advise: <strong style="color:${pcol(c.advise)}">${esc(c.players[c.advise])}</strong></span>
+    </div>
+  </section>
+  <section class="panel">
+    <div class="panel-head">
+      <h3>${S.phase === "feedback" ? "The game after your move" : "The game as it stands"}</h3>
+      ${S.phase === "choose" ? `<button class="toggle" id="eq-btn" aria-pressed="${S.showEq}">${S.showEq ? "Hide" : "Show"} current outcome</button>` : ""}
+    </div>
+    <div class="treebox" id="tree"></div>
+    <p class="note">${S.phase === "feedback" ? "Thick orange line: the equilibrium path after your move. Faint orange: what each player would choose off the path." :
+      S.showEq ? `Current equilibrium: <strong>${esc(c.terms[base.outcome].name)}</strong>. Solve it yourself first if you can.` :
+      "Try solving it by backward induction before you choose. The dashed box is your target."}</p>
+  </section>
+  <section class="panel">
+    <div class="panel-head">
+      <span class="chip ${round.tech}">${TECH[round.tech].name}</span>
+      <div class="progress" aria-label="Progress">${c.rounds.map((_, i) => `<i class="${i < res.length ? (res[i] === "missed" ? "miss" : "ok") : i === S.r ? "now" : ""}"></i>`).join("")}</div>
+    </div>
+    <p class="mission">You advise the <strong style="color:${pcol(c.advise)}">${esc(c.players[c.advise])}</strong>. ${esc(round.mission)} <span class="muted">Target: ${esc(c.terms[round.target].name)}.</span></p>
+    <fieldset class="opts" id="opts">
+      <legend class="eyebrow" style="margin-bottom:6px">Choose your move</legend>
+      ${S.order.map(i => { const opt = round.options[i];
+        let cls = "opt";
+        if (S.phase === "feedback") { cls += " locked"; if (i === S.sel) cls += S.verdict.correct ? " right" : " wrong"; }
+        else if (i === S.sel) cls += " sel";
+        return `<label class="${cls}"><input type="radio" name="opt" id="opt-${i}" value="${i}" ${i === S.sel ? "checked" : ""} ${S.phase === "feedback" ? "disabled" : ""}><span>${esc(opt.text)}</span></label>`; }).join("")}
+    </fieldset>`;
+  if (S.phase === "choose") {
+    html += `<div class="actions"><button class="btn" id="submit" ${S.sel === null ? "disabled" : ""}>Make the move</button></div>`;
+  } else {
+    html += feedbackBlock(c, round);
+  }
+  html += `</section>`;
+  return html;
+}
+
+function feedbackBlock(c, round){
+  const opt = round.options[S.sel], v = S.verdict, res = v.res;
+  const item = (state, text) => `<li><span class="mark ${state}">${state === "y" ? "✓" : state === "n" ? "✗" : "–"}</span><span>${text}</span></li>`;
+  let checks = item(v.techOk ? "y" : "n", v.techOk ? `Technique: this is a <strong>${TECH[opt.tech].name}</strong> move, as the round asks.` :
+    `Technique: this is a <strong>${TECH[opt.tech].name}</strong> move, but this round asks for <strong>${TECH[round.tech].name}</strong>.`);
+  if (v.hasForce) {
+    const cr = res.credibility[0], who = c.players[cr.owner];
+    checks += item(cr.ok ? "y" : "n", cr.ok ?
+      `Credibility: when the moment comes, <strong>${esc(kidLabel(c, cr.node, cr.forced))}</strong> is worth ${cr.fv} to the ${esc(who)}, at least as much as any alternative, so the commitment is believed.` :
+      `Credibility: when the moment comes, <strong>${esc(kidLabel(c, cr.node, cr.forced))}</strong> is worth ${cr.fv} to the ${esc(who)}, but <strong>${esc(kidLabel(c, cr.node, cr.best))}</strong> is worth ${cr.bv}. The other side expects the ${esc(who)} to back down and ignores the commitment.`);
+  } else {
+    checks += item("na", "Credibility: no commitment to a future action is involved in this move.");
+  }
+  checks += item(v.reach ? "y" : "n", `Outcome: <strong>${esc(c.terms[res.outcome].name)}</strong> (${res.payoff[0]} · ${res.payoff[1]})${v.reach ? ", which is the target." : `. The target was ${esc(c.terms[round.target].name)}.`}`);
+  const last = S.r === c.rounds.length - 1;
+  return `<div class="verdict ${v.correct ? "good" : "bad"}" role="status">
+      <h3>${S.revealed ? "Here is the move that works" : v.correct ? (S.tries === 1 ? "Correct on the first try" : "Correct") : "Not quite"}</h3>
+      <ul class="checks">${checks}</ul>
+      <p class="why">${esc(opt.why)}</p>
+    </div>
+    <div class="actions">
+      ${v.correct ? `<button class="btn" id="next">${last ? "See the debrief" : "Next round"}</button>` :
+        `<button class="btn" id="retry">Try another move</button><button class="btn ghost" id="reveal">Show the answer and move on</button>`}
+    </div>`;
+}
+
+function debriefView(){
+  const c = CASES.find(x => x.id === S.cid), r = S.results[c.id];
+  const f = r.filter(x => x === "first").length;
+  const label = {first:"Correct first try", retry:"Correct after retry", missed:"Answer revealed"};
+  return `<section class="debrief">
+    <span class="eyebrow">${esc(c.domain)} · Debrief</span>
+    <h2>${esc(c.title)}: ${f} of 3 on the first try</h2>
+    <div class="rows">${c.rounds.map((rd, i) => { const ok = rd.options.find(o => judge(c, rd, o).correct);
+      return `<div class="row"><span class="chip ${rd.tech}">${TECH[rd.tech].name}</span><span style="flex:1 1 280px;min-width:0">${esc(ok.text)}</span><span class="res" style="color:${r[i] === "missed" ? "var(--bad)" : "var(--good)"}">${label[r[i]]}</span></div>`; }).join("")}</div>
+    <div class="lesson"><span class="eyebrow">Key lesson</span><p style="margin-top:6px">${esc(c.lesson)}</p></div>
+    <div class="panel"><h3>Discussion prompt</h3><p>Each winning move here has a real-world cost the model leaves out: legal risk, money, relationships, or the chance the other side doesn't believe you. Which of the three would you actually recommend to the ${esc(c.full[c.advise])}, and what would have to be true for it to work?</p></div>
+    <div class="actions">
+      ${CASES.filter(x => x.id !== c.id).map(x => `<button class="btn" data-case="${x.id}">Play ${esc(x.title)}</button>`).join("")}
+      <button class="btn ghost" data-case="${c.id}">Replay this case</button>
+      <button class="btn ghost" id="home2">All cases</button>
+    </div>
+  </section>`;
+}
+
+/* ---- wiring ---- */
+function shuffle(n){ const a = [...Array(n).keys()]; for (let i = n-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function startCase(id){ S.cid = id; S.results[id] = []; startRound(0); }
+function startRound(r){ const c = CASES.find(x => x.id === S.cid); S.r = r; S.sel = null; S.phase = "choose"; S.tries = 0; S.showEq = false; S.revealed = false; S.order = shuffle(c.rounds[r].options.length); S.view = "round"; render(); window.scrollTo({top:0}); }
+
+function wire(){
+  const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener("click", fn); };
+  on("home-btn", () => { S.view = "home"; render(); });
+  on("home2", () => { S.view = "home"; render(); });
+  document.querySelectorAll("[data-case]").forEach(b => b.addEventListener("click", () => startCase(b.dataset.case)));
+  if (S.view !== "round") return;
+  const c = CASES.find(x => x.id === S.cid), round = c.rounds[S.r];
+  const tree = document.getElementById("tree");
+  if (S.phase === "choose") tree.innerHTML = drawTree(c, solve(c, []), {highlight:S.showEq, target:round.target});
+  else tree.innerHTML = drawTree(c, S.verdict.res, {highlight:true, target:round.target});
+  document.querySelectorAll('input[name="opt"]').forEach(inp => inp.addEventListener("change", () => { S.sel = +inp.value; render(); }));
+  on("eq-btn", () => { S.showEq = !S.showEq; render(); });
+  on("submit", () => {
+    if (S.sel === null) return;
+    S.tries++; S.verdict = judge(c, round, round.options[S.sel]); S.phase = "feedback";
+    if (S.verdict.correct) S.results[c.id][S.r] = S.tries === 1 ? "first" : "retry";
+    render();
+    const v = document.querySelector(".verdict"); if (v) v.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block:"center"});
+  });
+  on("retry", () => { S.phase = "choose"; S.sel = null; render(); });
+  on("reveal", () => {
+    S.results[c.id][S.r] = "missed";
+    const idx = round.options.findIndex(o => judge(c, round, o).correct);
+    S.sel = idx; S.verdict = judge(c, round, round.options[idx]); S.revealed = true; render();
+  });
+  on("next", () => { if (S.r < c.rounds.length - 1) startRound(S.r + 1); else { S.view = "debrief"; render(); window.scrollTo({top:0}); } });
+}
+
+render();
+</script>
+</body>
+</html>
